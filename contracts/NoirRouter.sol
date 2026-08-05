@@ -9,8 +9,8 @@ import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-/// @title NoirRouter
-/// @author Noir Protocol
+/// @title PoolRouter
+/// @author Pool Protocol
 /// @notice Routes the unfilled remainder of a CLOB order into a Uniswap v4 pool.
 ///
 /// Flow:
@@ -25,7 +25,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 /// or permission is required on the target pool.
 ///
 /// @dev EIP-712 domain uses chainId 4663 (Robinhood Chain).
-contract NoirRouter {
+contract PoolRouter {
     using SafeERC20 for IERC20;
 
     // ──────────────────────────────────────────────
@@ -107,7 +107,7 @@ contract NoirRouter {
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256("NoirRouter"),
+                keccak256("PoolRouter"),
                 keccak256("1"),
                 uint256(4663), // Robinhood Chain
                 address(this)
@@ -120,7 +120,7 @@ contract NoirRouter {
     // ──────────────────────────────────────────────
 
     /// @notice Routes an unfilled order remainder through a Uniswap v4 pool.
-    /// @dev Called by the Noir relayer after partial CLOB fills.
+    /// @dev Called by the Pool relayer after partial CLOB fills.
     ///      The trader must have approved this contract for `amountIn` of `tokenIn`.
     function route(RouteOrder calldata order) external returns (BalanceDelta delta) {
         // --- Checks ---
