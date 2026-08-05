@@ -1,48 +1,88 @@
 # settlement-contracts
 
-On-chain settlement layer for Noir Protocol.
+On-chain infrastructure for Noir Protocol — a CLOB matching engine for tokenized equities on Robinhood Chain (chain ID 4663).
 
-Non-custodial. Nothing moves unless both sides signed for it.
+**Pool is liquidity. Orderbook is the market on top.**
+
+The matching engine runs off-chain. When two orders cross, the engine fills against resting limit orders on the CLOB first. Any unfilled remainder routes through Uniswap v4 pools for immediate execution at the AMM curve price.
 
 ## Architecture
 
-The matching engine runs off-chain. When two orders cross, the engine produces a `SettlementBatch` — the trade parameters signed by both buyer and seller. The `Settlement` contract verifies both signatures and atomically transfers assets.
-
 ```
-off-chain matching engine
-        ↓
-  SettlementBatch (both sigs)
-        ↓
-  Settlement.settle()
-        ↓
-  asset → buyer
-  collateral → seller
+         incoming order
+              │
+     ┌────────┴────────┐
+     │  CLOB matching   │  ← off-chain engine matches against resting limit orders
+     │  engine          │
+     └────────┬────────┘
+              │
+      ┌───────┴───────┐
+      │               │
+  filled           remainder
+      │               │
+      ▼               ▼
+ Settlement.sol   NoirRouter.sol
+ (atomic swap)    (swap via v4 pool)
 ```
 
-No funds ever pass through Noir Protocol. The contract transfers directly between counterparties.
+For Noir's own pools, `NoirHook` intercepts swaps at the v4 level and fills against the CLOB before the AMM curve is touched — giving limit-order traders priority over passive LPs.
 
-## Contract
+## Contracts
 
-`contracts/Settlement.sol`
+### `contracts/Settlement.sol`
 
-- `settle(batch)` — verifies EIP-712 signatures from both parties, executes atomic swap
+Settles matched CLOB trades. Both buyer and seller sign an EIP-712 `SettlementBatch`; the contract verifies signatures and atomically transfers assets. No funds pass through Noir — transfers go directly between counterparties.
+
+- `settle(batch)` — verifies both EIP-712 signatures, executes atomic swap
 - `cancel(tradeId)` — either party can cancel before settlement
 - `settled[id]` / `cancelled[id]` — public state, fully auditable
 
-## Deploy
+### `contracts/NoirRouter.sol`
+
+Routes unfilled order remainders into Uniswap v4 pools. Works with any v4 pool permissionlessly — including pools deployed via pools.trade or any other v4 pool factory.
+
+- Accepts a signed `RouteOrder` (EIP-712, chainId 4663) with the unmatched quantity
+- Calls `IPoolManager.swap()` on the specified pool
+- Enforces slippage protection via `minAmountOut`
+- Replay-protected via per-trader nonces
+
+### `contracts/NoirHook.sol`
+
+A Uniswap v4 hook that intercepts `beforeSwap` and fills against the CLOB orderbook when resting limit orders offer a better price than the curve.
+
+- Returns `BeforeSwapDelta` to skip the AMM for the CLOB-matched portion
+- Only active on Noir-deployed pools (v4 pools accept exactly one hook)
+- For external pools, Noir connects via the Router instead
+
+## Integration Paths
+
+| Pool type | Integration | How it works |
+|-----------|------------|--------------|
+| Noir-owned pool | `NoirHook` (beforeSwap) | Hook intercepts swaps, fills vs CLOB first, remainder hits AMM |
+| External pool (pools.trade, etc.) | `NoirRouter` | Router calls `IPoolManager.swap()` after CLOB matching |
+
+Noir routes through Uniswap v4 pools — this is permissionless, like deploying on Ethereum. No partnership or special access required.
+
+## Build & Test
 
 ```bash
-# using Foundry
+# Install dependencies
+forge install
+
+# Build
 forge build
-forge deploy --rpc-url $RPC_URL contracts/Settlement.sol:Settlement
+
+# Test
+forge test
 ```
 
 ## Security
 
-- No admin keys, no upgradeable proxy
+- No admin keys, no upgradeable proxy on Settlement
 - Each trade is a one-time `bytes32 tradeId` — replay-proof
 - Deadline enforced on-chain
 - Pure EIP-712 signature verification — no trusted oracle
+- NoirHook operator is the only permissioned role (the relayer that stages CLOB fills)
 
 ## License
 
