@@ -29,7 +29,7 @@ contract SettlementTest is Test {
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256("Noir Protocol"),
+                keccak256("Pool Protocol"),
                 keccak256("1"),
                 block.chainid,
                 address(settlement)
