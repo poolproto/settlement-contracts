@@ -12,28 +12,28 @@ import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-/// @title NoirHook
-/// @author Noir Protocol
-/// @notice A Uniswap v4 hook that intercepts swaps and fills against the Noir CLOB
+/// @title PoolHook
+/// @author Pool Protocol
+/// @notice A Uniswap v4 hook that intercepts swaps and fills against the Pool CLOB
 ///         orderbook when resting limit orders offer a better price than the AMM curve.
 ///
 /// ## Architecture Note
 ///
-/// In Uniswap v4, each pool has exactly ONE hook. This means NoirHook can only be
-/// attached to pools that Noir Protocol deploys itself — it cannot be retroactively
+/// In Uniswap v4, each pool has exactly ONE hook. This means PoolHook can only be
+/// attached to pools that Pool Protocol deploys itself — it cannot be retroactively
 /// added to external pools (e.g., pools created via pools.trade or other factories).
 ///
-/// For external v4 pools, Noir connects via `NoirRouter.sol`, which calls
+/// For external v4 pools, Pool connects via `PoolRouter.sol`, which calls
 /// `IPoolManager.swap()` directly. The router is permissionless and works with any
 /// pool regardless of its hook configuration.
 ///
 /// Summary of the two integration paths:
 ///
 ///   ┌──────────────────┐     ┌──────────────────────────────────┐
-///   │  Noir-owned pool │     │  External pool (pools.trade etc) │
-///   │  hook = NoirHook │     │  hook = anything / none          │
+///   │  Pool-owned pool │     │  External pool (pools.trade etc) │
+///   │  hook = PoolHook │     │  hook = anything / none          │
 ///   │                  │     │                                  │
-///   │  beforeSwap ───► │     │  NoirRouter calls swap() ──────► │
+///   │  beforeSwap ───► │     │  PoolRouter calls swap() ──────► │
 ///   │  fills vs CLOB   │     │  remainder after CLOB match      │
 ///   └──────────────────┘     └──────────────────────────────────┘
 ///
@@ -41,7 +41,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 ///      registered operator) and returns a `BeforeSwapDelta` that reduces the
 ///      swap amount by whatever the CLOB matched, so the AMM curve only prices
 ///      the true remainder.
-contract NoirHook is IHooks {
+contract PoolHook is IHooks {
     using PoolIdLibrary for PoolKey;
     using SafeERC20 for IERC20;
 
@@ -52,7 +52,7 @@ contract NoirHook is IHooks {
     IPoolManager public immutable poolManager;
 
     /// @notice The operator is the only address that can submit CLOB fill results.
-    ///         This is Noir's relayer — the off-chain matching engine.
+    ///         This is Pool's relayer — the off-chain matching engine.
     address public operator;
     address public owner;
 
@@ -130,7 +130,7 @@ contract NoirHook is IHooks {
     // ──────────────────────────────────────────────
 
     /// @notice Stages a CLOB fill for the next swap on a given pool.
-    /// @dev Called by the Noir relayer in the same tx (or a preceding tx in the
+    /// @dev Called by the Pool relayer in the same tx (or a preceding tx in the
     ///      same block) as the user's swap. The fill is consumed in `beforeSwap`.
     function stageFill(PoolKey calldata key, CLOBFill calldata fill) external onlyOperator {
         pendingFills[key.toId()] = fill;
