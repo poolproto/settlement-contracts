@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-/// @title Noir Protocol Settlement
+/// @title Pool Protocol Settlement
 /// @notice Non-custodial settlement for matched tokenized equity orders.
 ///         Nothing moves unless the trader signed for it.
 contract Settlement {
@@ -81,7 +81,7 @@ contract Settlement {
     function _domainSeparator() internal view returns (bytes32) {
         return keccak256(abi.encode(
             keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-            keccak256("Noir Protocol"),
+            keccak256("Pool Protocol"),
             keccak256("1"),
             block.chainid,
             address(this)
